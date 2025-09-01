@@ -1,40 +1,34 @@
 version: 0.2
 
-# This phase is for setting up environment variables.
-# We'll retrieve the ECR repository URI and other details.
 env:
+  # We will retrieve these values and set them as environment variables
+  # so the build can use them.
   variables:
-    # This is your ECR repository name.
     ECR_REPO_NAME: "node-app-repo"
-    # This is the name of the Docker image.
     IMAGE_NAME: "node-app"
-
-# This phase runs before the main build.
-phases:
+  
+  # The commands in this section will run before the main phases
+  # to set the AWS_ACCOUNT_ID and AWS_DEFAULT_REGION variables.
   pre_build:
     commands:
-      # Retrieve the login command from ECR and execute it.
+      # Retrieve the AWS account ID and set it as a variable
+      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      # Retrieve the AWS default region and set it as a variable
+      - export AWS_DEFAULT_REGION=$(aws configure get region)
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
-  # This is the main build phase.
   build:
     commands:
-      # Build the Docker image, giving it a tag with the commit hash.
       - echo "Building the Docker image..."
       - docker build -t $ECR_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION .
       - docker tag $ECR_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest
   
-  # This phase runs after the build.
   post_build:
     commands:
-      # Push the image to ECR.
       - echo "Pushing the Docker image to ECR..."
       - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest
-      # Create an image definition file to tell CodePipeline which image to deploy.
       - printf '[{"name":"node-app-container","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest > imagedefinitions.json
 artifacts:
   files:
-    # Tell CodeBuild to export the imagedefinitions.json file as an artifact.
-    # This will be passed to the ECS deploy stage.
     - imagedefinitions.json
