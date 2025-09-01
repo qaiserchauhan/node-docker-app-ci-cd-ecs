@@ -1,34 +1,28 @@
 version: 0.2
 
 env:
-  # We will retrieve these values and set them as environment variables
-  # so the build can use them.
   variables:
     ECR_REPO_NAME: "node-app-repo"
     IMAGE_NAME: "node-app"
-  
-  # The commands in this section will run before the main phases
-  # to set the AWS_ACCOUNT_ID and AWS_DEFAULT_REGION variables.
+
+phases:
   pre_build:
     commands:
-      # Retrieve the AWS account ID and set it as a variable
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      # Retrieve the AWS default region and set it as a variable
       - export AWS_DEFAULT_REGION=$(aws configure get region)
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-
   build:
     commands:
       - echo "Building the Docker image..."
       - docker build -t $ECR_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION .
       - docker tag $ECR_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest
-  
   post_build:
     commands:
       - echo "Pushing the Docker image to ECR..."
       - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest
       - printf '[{"name":"node-app-container","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:latest > imagedefinitions.json
+
 artifacts:
   files:
     - imagedefinitions.json
