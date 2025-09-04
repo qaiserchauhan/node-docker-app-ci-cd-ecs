@@ -6,6 +6,6 @@ app.get('/', (req, res) => {
   res.send('Hello from Docker! This app is running on a container.');
 });
 
-app.listen(port, () => {
-  console.log(`App listening at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`App listening on port ${port}`);
 });
